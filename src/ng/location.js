@@ -329,6 +329,74 @@ function LocationHashbangInHtml5Url(appBase, appBaseNoFile, hashPrefix) {
   };
 }
 
+function LocationHtml5UrlInMicroZoe(appBase, appBaseNoFile, basePrefix) {
+  this.$$html5 = true;
+  basePrefix = basePrefix || '';
+  parseAbsoluteUrl(appBase, this);
+
+
+  this.__compose = function() {
+    this.$$url = normalizePath(this.$$path, this.$$search, this.$$hash);
+    this.$$url = this.$$url.replace(/%2F/g, '/')
+                    .replace(/%3F/g, '?');
+    this.$$absUrl = this.$$normalizeUrl(this.$$url);
+    this.$$urlUpdatedByLocation = true;    
+  }
+
+  /**
+   * Parse given HTML5 (regular) URL string into properties
+   * @param {string} url HTML5 URL
+   * @private
+   */
+  this.$$parse = function(url) {
+    var pathUrl = stripBaseUrl(appBaseNoFile, url);
+    if (!isString(pathUrl)) {
+      throw $locationMinErr('ipthprfx', 'Invalid url "{0}", missing path prefix "{1}".', url,
+          appBaseNoFile);
+    }
+
+    parseAppUrl(pathUrl, this, true);
+
+    if (!this.$$path) {
+      this.$$path = '/';
+    }
+
+    this.__compose();
+  };
+
+  this.$$normalizeUrl = function(url) {
+    return appBaseNoFile + url.substr(1); // first char is always '/'
+  };
+
+  this.$$parseLinkUrl = function(url, relHref) {
+    if (relHref && relHref[0] === '#') {
+      // special case for links to hash fragments:
+      // keep the old url and only replace the hash fragment
+      this.hash(relHref.slice(1));
+      return true;
+    }
+    var appUrl, prevAppUrl;
+    var rewrittenUrl;
+
+
+    if (isDefined(appUrl = stripBaseUrl(appBase, url))) {
+      prevAppUrl = appUrl;
+      if (basePrefix && isDefined(appUrl = stripBaseUrl(basePrefix, appUrl))) {
+        rewrittenUrl = appBaseNoFile + (stripBaseUrl('/', appUrl) || appUrl);
+      } else {
+        rewrittenUrl = appBase + prevAppUrl;
+      }
+    } else if (isDefined(appUrl = stripBaseUrl(appBaseNoFile, url))) {
+      rewrittenUrl = appBaseNoFile + appUrl;
+    } else if (appBaseNoFile === url + '/') {
+      rewrittenUrl = appBaseNoFile;
+    }
+    if (rewrittenUrl) {
+      this.$$parse(rewrittenUrl);
+    }
+    return !!rewrittenUrl;
+  };
+}
 
 var locationPrototype = {
 
@@ -731,7 +799,8 @@ function $LocationProvider() {
       html5Mode = {
         enabled: false,
         requireBase: true,
-        rewriteLinks: true
+        rewriteLinks: true,
+        microzoe: false
       };
 
   /**
@@ -790,6 +859,10 @@ function $LocationProvider() {
 
       if (isBoolean(mode.rewriteLinks) || isString(mode.rewriteLinks)) {
         html5Mode.rewriteLinks = mode.rewriteLinks;
+      }
+
+      if (isBoolean(mode.microzoe)) {
+        html5Mode.microzoe = mode.microzoe;
       }
 
       return this;
@@ -851,7 +924,12 @@ function $LocationProvider() {
           '$location in HTML5 mode requires a <base> tag to be present!');
       }
       appBase = serverBase(initialUrl) + (baseHref || '/');
-      LocationMode = $sniffer.history ? LocationHtml5Url : LocationHashbangInHtml5Url;
+      if (html5Mode.microzoe) {
+        LocationMode = LocationHtml5UrlInMicroZoe;
+      }
+      else {
+        LocationMode = $sniffer.history ? LocationHtml5Url : LocationHashbangInHtml5Url;
+      }
     } else {
       appBase = stripHash(initialUrl);
       LocationMode = LocationHashbangUrl;
