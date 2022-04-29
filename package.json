@@ -1,6 +1,7 @@
 {
   "name": "angular",
   "license": "MIT",
+  "version": "0.0.3",
   "branchVersion": "^1.8.0",
   "branchPattern": "1.8.*",
   "distTag": "next",
